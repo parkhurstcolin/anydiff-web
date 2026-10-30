@@ -1,0 +1,128 @@
+[
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F3",
+  "before": null,
+  "after": "contingency",
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F4",
+  "before": null,
+  "after": 24000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F5",
+  "before": null,
+  "after": 25000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F6",
+  "before": null,
+  "after": 26000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F7",
+  "before": null,
+  "after": 27000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F8",
+  "before": null,
+  "after": 28000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F9",
+  "before": null,
+  "after": 29000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F10",
+  "before": null,
+  "after": 30000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F11",
+  "before": null,
+  "after": 31000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F12",
+  "before": null,
+  "after": 32000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F13",
+  "before": null,
+  "after": 33000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!B14",
+  "before": 4200000,
+  "after": 4800000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F14",
+  "before": null,
+  "after": 34000,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "Q3-forecast.xlsx",
+  "kind": "cell",
+  "where": "Sheet2!F15",
+  "before": null,
+  "after": 35000,
+  "confidence": "exact",
+  "note": null
+ }
+]

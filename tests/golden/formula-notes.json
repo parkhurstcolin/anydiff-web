@@ -1,0 +1,65 @@
+[
+ {
+  "path": "formula-notes.xlsx",
+  "kind": "cell",
+  "where": "Formulas!B1",
+  "before": 7,
+  "after": 8,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "formula-notes.xlsx",
+  "kind": "cell",
+  "where": "Formulas!C2",
+  "before": "=A2*2",
+  "after": "=A2*3",
+  "confidence": "exact",
+  "note": "formula changed, value unchanged"
+ },
+ {
+  "path": "formula-notes.xlsx",
+  "kind": "cell",
+  "where": "Formulas!D3",
+  "before": 3,
+  "after": 4,
+  "confidence": "exact",
+  "note": "formula also changed"
+ },
+ {
+  "path": "formula-notes.xlsx",
+  "kind": "cell",
+  "where": "Formulas!E4",
+  "before": 1,
+  "after": "=1",
+  "confidence": "exact",
+  "note": "formula changed"
+ },
+ {
+  "path": "formula-notes.xlsx",
+  "kind": "cell",
+  "where": "Formulas!F5",
+  "before": 5,
+  "after": "=A2+3",
+  "confidence": "exact",
+  "note": "formula changed, cached values unavailable"
+ },
+ {
+  "path": "formula-notes.xlsx",
+  "kind": "cell",
+  "where": "Formulas!G6",
+  "before": true,
+  "after": 1,
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "formula-notes.xlsx",
+  "kind": "cell",
+  "where": "Formulas!H7",
+  "before": 10,
+  "after": null,
+  "confidence": "exact",
+  "note": null
+ }
+]
