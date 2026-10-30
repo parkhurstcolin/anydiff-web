@@ -97,7 +97,7 @@ export default function ResultsView({
   const sideActive = mode === "side" && !!pair && changes.length > 0;
 
   return (
-    <section className={sideActive ? "mt-3" : "mt-8"}>
+    <section className="mt-8">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <h2 className="text-sm font-semibold text-zinc-900">
           {changes.length === 0
