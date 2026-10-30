@@ -6,6 +6,7 @@ import ResultsView from "./ResultsView";
 import { diffDocx } from "../core/docxDiff";
 import { diffXlsx } from "../core/xlsxDiff";
 import type { Change } from "../core/model";
+import type { DocPair } from "../core/sideView";
 import { extractDocx } from "../extract/docx";
 import { extractXlsx } from "../extract/xlsx";
 
@@ -61,6 +62,7 @@ export default function DiffBoard() {
   const [oldFile, setOld] = useState<Slot>(null);
   const [newFile, setNew] = useState<Slot>(null);
   const [changes, setChanges] = useState<Change[] | null>(null);
+  const [pair, setPair] = useState<DocPair | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -72,13 +74,20 @@ export default function DiffBoard() {
         throw new Error("Both files must be the same type — .xlsx with .xlsx, .docx with .docx.");
       }
       const [a, b] = await Promise.all([old.bytes, fresh.bytes]);
-      const result =
-        old.ext === "docx"
-          ? diffDocx(await extractDocx(a, old.name), await extractDocx(b, fresh.name), fresh.name)
-          : diffXlsx(await extractXlsx(a), await extractXlsx(b), fresh.name);
-      setChanges(result);
+      if (old.ext === "docx") {
+        const d1 = await extractDocx(a, old.name);
+        const d2 = await extractDocx(b, fresh.name);
+        setPair({ kind: "docx", old: d1, new: d2 });
+        setChanges(diffDocx(d1, d2, fresh.name));
+      } else {
+        const s1 = await extractXlsx(a);
+        const s2 = await extractXlsx(b);
+        setPair({ kind: "xlsx", old: s1, new: s2 });
+        setChanges(diffXlsx(s1, s2, fresh.name));
+      }
     } catch (e) {
       setChanges(null);
+      setPair(null);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
@@ -147,7 +156,15 @@ export default function DiffBoard() {
 
       {error && <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</p>}
 
-      {changes && <ResultsView key={`${oldFile?.name}->${newFile?.name}`} changes={changes} oldName={oldFile?.name} newName={newFile?.name} />}
+      {changes && (
+        <ResultsView
+          key={`${oldFile?.name}->${newFile?.name}`}
+          changes={changes}
+          pair={pair}
+          oldName={oldFile?.name}
+          newName={newFile?.name}
+        />
+      )}
     </main>
   );
 }

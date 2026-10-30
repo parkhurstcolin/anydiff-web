@@ -16,7 +16,9 @@ import {
   type TableBlock,
 } from "../extract/docx";
 
-const blockToken = (b: Block): string =>
+// exported for the side-by-side view: it must line blocks up exactly the
+// way the differ does, or highlights would disagree with the change list
+export const blockToken = (b: Block): string =>
   b.blockType === "table"
     ? "T|" + b.rows.map((row) => row.join("\x1e")).join("\x1f")
     : `P|${b.style}|` +
@@ -65,7 +67,7 @@ function pairRows(oldt: TableBlock, newt: TableBlock, i1: number, i2: number, j1
 const paraWhere = (p: ParagraphBlock, n: number) =>
   p.style !== "Normal" ? `¶${n} [${p.style}]` : `¶${n}`;
 
-const fmtSig = (p: ParagraphBlock) => p.runs.map((r) => `${r.text}|${r.bold}|${r.italic}`).join(";");
+export const fmtSig = (p: ParagraphBlock) => p.runs.map((r) => `${r.text}|${r.bold}|${r.italic}`).join(";");
 
 function blockAdded(display: string, b: Block, n: number): Change {
   if (b.blockType === "table") {

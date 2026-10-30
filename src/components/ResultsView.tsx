@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 
+import SideBySideView from "./SideBySideView";
 import { fmtValue, visible } from "../core/format";
 import type { Change } from "../core/model";
+import type { DocPair } from "../core/sideView";
 import { diffWords } from "../core/wordDiff";
 
 const CAP = 40;
@@ -64,14 +66,17 @@ function groupKey(c: Change): string {
 
 export default function ResultsView({
   changes,
+  pair,
   oldName,
   newName,
 }: {
   changes: Change[];
+  pair?: DocPair | null;
   oldName?: string;
   newName?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [mode, setMode] = useState<"side" | "list">("side");
   const structural = changes.filter(isStructural);
   const content = changes.filter((c) => !isStructural(c));
   const groups = new Map<string, Change[]>();
@@ -84,6 +89,8 @@ export default function ResultsView({
   const edits = content.filter((c) => c.before !== null && c.after !== null).length;
   const adds = content.filter((c) => c.before === null).length;
   const removes = content.filter((c) => c.after === null).length;
+  const seg = (active: boolean) =>
+    `px-3 py-1.5 ${active ? "bg-zinc-900 text-white" : "bg-white text-zinc-600 hover:bg-zinc-100"}`;
 
   return (
     <section className="mt-8">
@@ -98,6 +105,16 @@ export default function ResultsView({
         <span className="text-xs text-zinc-500">
           {oldName} → {newName}
         </span>
+        {changes.length > 0 && pair && (
+          <div className="ml-auto flex overflow-hidden rounded-md border border-zinc-300 text-xs font-medium">
+            <button type="button" className={seg(mode === "side")} onClick={() => setMode("side")}>
+              Side by side
+            </button>
+            <button type="button" className={`border-l border-zinc-300 ${seg(mode === "list")}`} onClick={() => setMode("list")}>
+              Change list
+            </button>
+          </div>
+        )}
       </div>
 
       {changes.length === 0 && (
@@ -107,7 +124,13 @@ export default function ResultsView({
         </p>
       )}
 
-      {structural.length > 0 && (
+      {mode === "side" && pair && changes.length > 0 && (
+        <SideBySideView pair={pair} changes={changes} oldName={oldName} newName={newName} />
+      )}
+
+      {!(mode === "side" && pair && changes.length > 0) && (
+        <>
+          {structural.length > 0 && (
         <div className="mt-4 rounded-lg border border-zinc-200 bg-white">
           {structural.map((c, i) => {
             const l = rowLabel(c);
@@ -172,6 +195,8 @@ export default function ResultsView({
           </div>
         );
       })}
+        </>
+      )}
     </section>
   );
 }
