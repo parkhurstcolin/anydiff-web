@@ -65,10 +65,9 @@ export function sequenceMatcher(
   const blocks: [number, number, number][] = [];
   while (queue.length) {
     const [alo, ahi, blo, bhi] = queue.pop()!;
-    const x = findLongestMatch(alo, ahi, blo, bhi);
-    const [i, j, k] = x;
+    const [i, j, k] = findLongestMatch(alo, ahi, blo, bhi);
     if (k) {
-      blocks.push(x);
+      blocks.push([i, j, k]);
       if (alo < i && blo < j) queue.push([alo, i, blo, j]);
       if (i + k < ahi && j + k < bhi) queue.push([i + k, ahi, j + k, bhi]);
     }
