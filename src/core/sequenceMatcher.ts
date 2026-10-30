@@ -8,11 +8,11 @@
 export type OpcodeTag = "replace" | "delete" | "insert" | "equal";
 export type Opcode = readonly [tag: OpcodeTag, i1: number, i2: number, j1: number, j2: number];
 
-export function sequenceMatcher(
-  a: readonly string[],
-  b: readonly string[],
+export function sequenceMatcher<T>(
+  a: readonly T[],
+  b: readonly T[],
 ): Opcode[] {
-  const b2j = new Map<string, number[]>();
+  const b2j = new Map<T, number[]>();
   b.forEach((el, j) => {
     const arr = b2j.get(el);
     if (arr) arr.push(j);

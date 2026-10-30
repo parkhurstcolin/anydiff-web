@@ -6,6 +6,7 @@
  */
 
 import { jaccard } from "./align";
+import { cyrb53, foldBlock, newSumXor } from "./hash";
 import { change, type Change } from "./model";
 import { sequenceMatcher } from "./sequenceMatcher";
 import {
@@ -26,6 +27,20 @@ export const blockToken = (b: Block): string =>
 
 const rowKey = (row: string[]) => row.join("\x1e");
 const joinRow = (row: string[]) => row.join(" | ");
+
+/** Document fingerprint: per-block digests chained IN ORDER (a moved
+ *  paragraph is a change, so block order must ripple through) — covers
+ *  style, run text, run format and cell text, so an equal fingerprint
+ *  means no Change can exist and the whole matcher run is skipped. */
+export const docxFingerprint = (doc: Docx): number => {
+  let h = 0;
+  for (const b of doc.blocks) {
+    const acc = newSumXor();
+    foldBlock(acc, b);
+    h = cyrb53(`${acc.sum}:${acc.xor}:${acc.count}`, h);
+  }
+  return cyrb53(`n:${doc.blocks.length}`, h);
+};
 
 /** Pair rows inside a size-changing replace block: equal first cells anchor
  *  (row labels), the rest pairs greedily by Jaccard >= 0.5 of cell sets;
@@ -142,7 +157,10 @@ function tableRowChanges(
   const changes: Change[] = [];
   const row = (kind: "row", where: string, before: string | null, after: string | null) =>
     changes.push(change({ path: display, kind, where, before, after, confidence }));
-  for (const [tag, i1, i2, j1, j2] of sequenceMatcher(oldt.rows.map(rowKey), newt.rows.map(rowKey))) {
+  for (const [tag, i1, i2, j1, j2] of sequenceMatcher(
+    oldt.rows.map((r) => cyrb53(rowKey(r))),
+    newt.rows.map((r) => cyrb53(rowKey(r))),
+  )) {
     if (tag === "equal") continue;
     const nOld = i2 - i1;
     const nNew = j2 - j1;
@@ -195,8 +213,11 @@ function blockPair(
 }
 
 export function diffDocx(old: Docx, new_: Docx, display = ""): Change[] {
+  // instant identical: fingerprints cover every field this function reads
+  if (docxFingerprint(old) === docxFingerprint(new_)) return [];
+  const hashTokens = (blocks: Block[]) => blocks.map((b) => cyrb53(blockToken(b)));
   const changes: Change[] = [];
-  const opcodes = sequenceMatcher(old.blocks.map(blockToken), new_.blocks.map(blockToken));
+  const opcodes = sequenceMatcher(hashTokens(old.blocks), hashTokens(new_.blocks));
   let onum = 0;
   let nnum = 0;
   for (const [tag, i1, i2, j1, j2] of opcodes) {

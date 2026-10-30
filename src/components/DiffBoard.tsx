@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 
 import ResultsView from "./ResultsView";
 import { diffDocx } from "../core/docxDiff";
+import { hashBytes } from "../core/hash";
 import { diffXlsx } from "../core/xlsxDiff";
 import type { Change } from "../core/model";
 import type { DocPair } from "../core/sideView";
@@ -74,6 +75,18 @@ export default function DiffBoard() {
         throw new Error("Both files must be the same type — .xlsx with .xlsx, .docx with .docx.");
       }
       const [a, b] = await Promise.all([old.bytes, fresh.bytes]);
+      if (a.byteLength === b.byteLength && hashBytes(new Uint8Array(a)) === hashBytes(new Uint8Array(b))) {
+        // same bytes: nothing a differ could report — extract once, zero changes
+        if (old.ext === "docx") {
+          const d = await extractDocx(a, old.name);
+          setPair({ kind: "docx", old: d, new: d });
+        } else {
+          const s = await extractXlsx(a);
+          setPair({ kind: "xlsx", old: s, new: s });
+        }
+        setChanges([]);
+        return;
+      }
       if (old.ext === "docx") {
         const d1 = await extractDocx(a, old.name);
         const d2 = await extractDocx(b, fresh.name);

@@ -5,6 +5,7 @@
  */
 
 import { alignByAnchors, keyCmp } from "./align";
+import { foldCell, newSumXor, sameSumXor } from "./hash";
 import { change, type Change, type ChangeValue } from "./model";
 import type { CellValue, Sheet } from "../extract/xlsx";
 
@@ -60,6 +61,16 @@ function sheetTokens(sheet: Sheet): ReadonlySet<string> {
   }
   return out;
 }
+
+/** Content fingerprint of a sheet: a pair with equal fingerprints cannot
+ *  contain cell changes (address, value and formula all fold in), so the
+ *  differ skips cellChanges entirely — no key-union allocation, no per-cell
+ *  lookups (the day-6 rule for 400k-cell sheets). */
+export const sheetFingerprint = (sheet: Sheet) => {
+  const acc = newSumXor();
+  for (const c of sheet.cells.values()) foldCell(acc, c.addr, c.value, c.formula);
+  return acc;
+};
 
 function cellChanges(
   path: string,
@@ -139,6 +150,8 @@ export function diffXlsx(
       [...m].map(([n, s]) => [n, () => sheetTokens(s)]), // lazy: exact-name pairs never tokenize
     );
   const alignment = alignByAnchors(asTokens(oldSheets), asTokens(newSheets));
+  const fpOld = new Map([...oldSheets].map(([n, s]) => [n, sheetFingerprint(s)]));
+  const fpNew = new Map([...newSheets].map(([n, s]) => [n, sheetFingerprint(s)]));
   const changes: Change[] = [];
   for (const pair of alignment.pairs) {
     if (pair.old !== pair.new) {
@@ -153,6 +166,7 @@ export function diffXlsx(
         }),
       );
     }
+    if (sameSumXor(fpOld.get(pair.old)!, fpNew.get(pair.new)!)) continue; // instant: no cell can differ
     for (const c of cellChanges(
       display,
       pair.new,
