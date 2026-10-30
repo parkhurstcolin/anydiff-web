@@ -67,16 +67,19 @@ function groupKey(c: Change): string {
 export default function ResultsView({
   changes,
   pair,
+  mode,
+  onMode,
   oldName,
   newName,
 }: {
   changes: Change[];
   pair?: DocPair | null;
+  mode: "side" | "list";
+  onMode: (m: "side" | "list") => void;
   oldName?: string;
   newName?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
-  const [mode, setMode] = useState<"side" | "list">("side");
   const structural = changes.filter(isStructural);
   const content = changes.filter((c) => !isStructural(c));
   const groups = new Map<string, Change[]>();
@@ -107,10 +110,10 @@ export default function ResultsView({
         </span>
         {changes.length > 0 && pair && (
           <div className="ml-auto flex overflow-hidden rounded-md border border-zinc-300 text-xs font-medium">
-            <button type="button" className={seg(mode === "side")} onClick={() => setMode("side")}>
+            <button type="button" className={seg(mode === "side")} onClick={() => onMode("side")}>
               Side by side
             </button>
-            <button type="button" className={`border-l border-zinc-300 ${seg(mode === "list")}`} onClick={() => setMode("list")}>
+            <button type="button" className={`border-l border-zinc-300 ${seg(mode === "list")}`} onClick={() => onMode("list")}>
               Change list
             </button>
           </div>

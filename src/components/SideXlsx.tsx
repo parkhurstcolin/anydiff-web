@@ -18,7 +18,7 @@ function Grid({ rows, col0, side }: { rows: GridRow[]; col0: number; side: "old"
   const letters: string[] = [];
   for (let c = col0; c < col0 + (rows[0]?.cells.length ?? 0); c++) letters.push(colLetter(c));
   return (
-    <div className="max-h-[440px] overflow-auto rounded border border-zinc-200">
+    <div className="max-h-[75vh] overflow-auto rounded border border-zinc-200">
       <table className="border-collapse">
         <thead>
           <tr className="text-[10px] text-zinc-400">

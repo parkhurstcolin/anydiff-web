@@ -63,6 +63,7 @@ export default function DiffBoard() {
   const [newFile, setNew] = useState<Slot>(null);
   const [changes, setChanges] = useState<Change[] | null>(null);
   const [pair, setPair] = useState<DocPair | null>(null);
+  const [mode, setMode] = useState<"side" | "list">("side");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -123,9 +124,10 @@ export default function DiffBoard() {
   }
 
   const bothReady = oldFile && newFile;
+  const fullPage = mode === "side" && !!pair && !!changes && changes.length > 0;
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-12">
+    <main className={`px-6 py-12 ${fullPage ? "w-full" : "mx-auto w-full max-w-5xl"}`}>
       <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">AnyDiff</h1>
       <p className="mt-1 max-w-xl text-sm text-zinc-600">
         What actually changed between two Excel or Word files — values, formulas, paragraphs,
@@ -161,6 +163,8 @@ export default function DiffBoard() {
           key={`${oldFile?.name}->${newFile?.name}`}
           changes={changes}
           pair={pair}
+          mode={mode}
+          onMode={setMode}
           oldName={oldFile?.name}
           newName={newFile?.name}
         />
