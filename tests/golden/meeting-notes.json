@@ -1,0 +1,29 @@
+[
+ {
+  "path": "meeting-notes.docx",
+  "kind": "paragraph",
+  "where": "\u00b61 [Heading1]",
+  "before": "Q3 Planning Meeting",
+  "after": "Q3 Planning Meeting Notes",
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "meeting-notes.docx",
+  "kind": "paragraph",
+  "where": "\u00b63",
+  "before": "Action items were reviewed. Owner: Dana",
+  "after": "Action items were reviewed and approved. Owner: Dana",
+  "confidence": "exact",
+  "note": null
+ },
+ {
+  "path": "meeting-notes.docx",
+  "kind": "row",
+  "where": "table 5 row 4",
+  "before": null,
+  "after": "Contingency | 0.6M | added",
+  "confidence": "exact",
+  "note": null
+ }
+]
