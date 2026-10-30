@@ -1,11 +1,17 @@
 "use client";
 
-import type { GridRow, SheetPane } from "../core/sideView";
+import { useEffect, useMemo, useRef, type Ref } from "react";
+
+import type { GridRow, SheetPane, XlsxTarget } from "../core/sideView";
 
 const SIDE = "bg-emerald-100 text-emerald-900";
 const LEFT = "bg-red-100 text-red-900";
 const CHIP = "rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-900";
 const GUTTER = "text-[10px] text-zinc-400";
+const FOCUS = "relative z-[5] outline outline-2 outline-sky-500";
+
+export const xlsxCellId = (pane: number, row: number, col: number, side: "o" | "n") => `sxt-${pane}-${row}-${col}-${side}`;
+export const xlsxPaneId = (pane: number) => `sxt-${pane}-h`;
 
 const colLetter = (n: number): string => {
   let s = "";
@@ -13,12 +19,30 @@ const colLetter = (n: number): string => {
   return s;
 };
 
-function Grid({ rows, col0, side }: { rows: GridRow[]; col0: number; side: "old" | "new" }) {
+function Grid({
+  rows,
+  col0,
+  side,
+  pid,
+  focus,
+  boxRef,
+  onScroll,
+  onPick,
+}: {
+  rows: GridRow[];
+  col0: number;
+  side: "old" | "new";
+  pid: number;
+  focus: XlsxTarget | null;
+  boxRef?: Ref<HTMLDivElement>;
+  onScroll?: () => void;
+  onPick?: (t: XlsxTarget) => void;
+}) {
   const changed = side === "old" ? LEFT : SIDE;
   const letters: string[] = [];
   for (let c = col0; c < col0 + (rows[0]?.cells.length ?? 0); c++) letters.push(colLetter(c));
   return (
-    <div className="max-h-[75vh] overflow-auto rounded border border-zinc-200">
+    <div ref={boxRef} onScroll={onScroll} className="max-h-[75vh] overflow-auto rounded border border-zinc-200">
       <table className="border-collapse">
         <thead>
           <tr className="text-[10px] text-zinc-400">
@@ -31,18 +55,20 @@ function Grid({ rows, col0, side }: { rows: GridRow[]; col0: number; side: "old"
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.map((r, ri) => (
             <tr key={r.n}>
               <th className="sticky left-0 z-10 border-b border-r border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-right align-top text-[10px] font-medium text-zinc-400">
                 {r.n}
               </th>
-              {r.cells.map((cell, i) => (
+              {r.cells.map((cell, ci) => (
                 <td
-                  key={i}
+                  key={ci}
+                  id={xlsxCellId(pid, ri, ci, side === "old" ? "o" : "n")}
                   title={cell?.title ?? undefined}
+                  onClick={cell?.changed && onPick ? () => onPick({ pane: pid, row: ri, col: ci }) : undefined}
                   className={`max-w-56 truncate border-b border-r border-zinc-100 px-2 py-0.5 font-mono text-xs ${
-                    cell?.changed ? changed : "text-zinc-700"
-                  }`}
+                    cell?.changed ? `${changed} cursor-pointer` : "text-zinc-700"
+                  } ${focus && focus.pane === pid && focus.row === ri && focus.col === ci ? FOCUS : ""}`}
                 >
                   {cell?.text ?? ""}
                 </td>
@@ -55,13 +81,44 @@ function Grid({ rows, col0, side }: { rows: GridRow[]; col0: number; side: "old"
   );
 }
 
-function Pane({ pane }: { pane: SheetPane }) {
+function syncScroll(
+  src: HTMLDivElement | null,
+  dst: HTMLDivElement | null,
+  lock: { current: boolean },
+): void {
+  if (!src || !dst || lock.current) return;
+  lock.current = true;
+  dst.scrollLeft = src.scrollLeft;
+  dst.scrollTop = src.scrollTop;
+  requestAnimationFrame(() => {
+    lock.current = false;
+  });
+}
+
+function Pane({
+  pane,
+  pid,
+  focus,
+  onPick,
+}: {
+  pane: SheetPane;
+  pid: number;
+  focus: XlsxTarget | null;
+  onPick: (t: XlsxTarget) => void;
+}) {
+  const oldBox = useRef<HTMLDivElement>(null);
+  const newBox = useRef<HTMLDivElement>(null);
+  const syncing = useRef(false);
+  const paired = pane.kind === "pair"; // both grids exist and share row/col windows
+
+  const headTarget: XlsxTarget = { pane: pid, row: -1, col: -1 };
+  const isHead = focus && focus.pane === pid && focus.row === -1;
   const label = (s: string) => <span className="truncate font-mono text-xs text-zinc-700">{s || "—"}</span>;
   return (
     <div className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-1.5">
         {pane.rename ? (
-          <span className="text-xs text-zinc-700">
+          <span id={xlsxPaneId(pid)} className={`text-xs text-zinc-700 ${isHead ? "rounded outline outline-2 outline-sky-500" : ""}`}>
             <span className={`rounded px-1 ${LEFT}`}>{pane.rename.old}</span>
             <span className="text-zinc-400"> → </span>
             <span className={`rounded px-1 ${SIDE}`}>{pane.rename.new}</span>
@@ -74,22 +131,95 @@ function Pane({ pane }: { pane: SheetPane }) {
         )}
         {pane.rename && pane.confidence === "moved" && <span className={CHIP}>renamed, moved</span>}
         {pane.rename && pane.confidence === "manual-inspect" && <span className={CHIP}>renamed, inspect</span>}
-        {pane.note && <span className={CHIP}>{pane.note}</span>}
+        {pane.note && (
+          <span id={pane.rename ? undefined : xlsxPaneId(pid)} className={`${CHIP} ${isHead && !pane.rename ? "outline outline-2 outline-sky-500" : ""}`}>
+            {pane.note}
+          </span>
+        )}
+        {(pane.rename || pane.note) && (
+          <button className="text-[10px] text-sky-600 hover:underline" onClick={() => onPick(headTarget)}>
+            jump
+          </button>
+        )}
         {pane.truncated && <span className={GUTTER}>window around changes</span>}
       </div>
       <div className="grid grid-cols-2 gap-4 p-3">
-        {pane.kind === "added" ? <div className={GUTTER}>not in before</div> : <Grid rows={pane.oldRows} col0={pane.col0} side="old" />}
-        {pane.kind === "removed" ? <div className={GUTTER}>not in after</div> : <Grid rows={pane.newRows} col0={pane.col0} side="new" />}
+        {pane.kind === "added" ? <div className={GUTTER}>not in before</div> : <Grid rows={pane.oldRows} col0={pane.col0} side="old" pid={pid} focus={focus} boxRef={oldBox} onScroll={paired ? () => syncScroll(oldBox.current, newBox.current, syncing) : undefined} onPick={onPick} />}
+        {pane.kind === "removed" ? <div className={GUTTER}>not in after</div> : <Grid rows={pane.newRows} col0={pane.col0} side="new" pid={pid} focus={focus} boxRef={newBox} onScroll={paired ? () => syncScroll(newBox.current, oldBox.current, syncing) : undefined} onPick={onPick} />}
       </div>
     </div>
   );
 }
 
-export default function SideXlsx({ panes }: { panes: SheetPane[] }) {
+export default function SideXlsx({
+  panes,
+  targets,
+  focus,
+  onPick,
+  tab,
+  onTab,
+}: {
+  panes: SheetPane[];
+  targets: XlsxTarget[];
+  focus: XlsxTarget | null;
+  onPick: (index: number) => void;
+  tab: number;
+  onTab: (i: number) => void;
+}) {
+  const indexOf = useMemo(() => {
+    const m = new Map<string, number>();
+    targets.forEach((t, i) => m.set(`${t.pane}:${t.row}:${t.col}`, i));
+    return m;
+  }, [targets]);
+  const counts = useMemo(() => {
+    const c = new Map<number, number>();
+    targets.forEach((t) => c.set(t.pane, (c.get(t.pane) ?? 0) + 1));
+    return c;
+  }, [targets]);
+
+  const lastJump = useRef<XlsxTarget | null>(null);
+  useEffect(() => {
+    if (focus === lastJump.current) return; // only move on a fresh jump, not on tab clicks or re-renders
+    lastJump.current = focus;
+    if (!focus || focus.pane !== tab) return;
+    const id = focus.row === -1 ? xlsxPaneId(focus.pane) : xlsxCellId(focus.pane, focus.row, focus.col, "o");
+    const alt = focus.row === -1 ? id : xlsxCellId(focus.pane, focus.row, focus.col, "n");
+    requestAnimationFrame(() => {
+      (document.getElementById(id) ?? document.getElementById(alt))?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+    });
+  }, [focus, tab]);
+
+  const pick = (t: XlsxTarget) => {
+    const i = indexOf.get(`${t.pane}:${t.row}:${t.col}`);
+    if (i !== undefined) onPick(i);
+  };
+
+  const showTabs = panes.length > 1;
+  const visible = showTabs ? [panes[tab] ?? panes[0]] : panes;
   return (
     <>
-      {panes.map((p, i) => (
-        <Pane key={i} pane={p} />
+      {showTabs && (
+        <div className="mt-3 flex flex-wrap items-end gap-1 border-b border-zinc-200">
+          {panes.map((p, i) => {
+            const n = counts.get(i) ?? 0;
+            const active = i === tab;
+            return (
+              <button
+                key={i}
+                onClick={() => onTab(i)}
+                className={`flex items-center gap-1.5 rounded-t px-2.5 py-1 text-xs ${
+                  active ? "border-x border-t border-zinc-200 bg-white font-medium text-zinc-800" : "text-zinc-500 hover:text-zinc-700"
+                }`}
+              >
+                <span className="max-w-40 truncate font-mono">{p.newLabel || p.oldLabel}</span>
+                {n > 0 && <span className={`rounded-full px-1.5 text-[10px] ${active ? "bg-red-100 text-red-900" : "bg-zinc-100 text-zinc-500"}`}>{n}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {visible.map((p) => (
+        <Pane key={panes.indexOf(p)} pane={p} pid={panes.indexOf(p)} focus={focus} onPick={pick} />
       ))}
     </>
   );

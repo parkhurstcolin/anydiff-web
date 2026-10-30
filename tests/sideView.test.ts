@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { diffDocx } from "../src/core/docxDiff";
 import { diffXlsx } from "../src/core/xlsxDiff";
-import { sideDocx, sideXlsx } from "../src/core/sideView";
+import { docxTargets, sideDocx, sideXlsx, xlsxTargets } from "../src/core/sideView";
 import { extractDocx } from "../src/extract/docx";
 import type { ParagraphBlock, TableBlock } from "../src/extract/docx";
 import type { Sheet } from "../src/extract/xlsx";
@@ -148,6 +148,46 @@ describe("sideDocx", () => {
   });
 });
 
+describe("navigator targets", () => {
+  it("xlsx: changed cells in reading order, header target for rename/remap panes", () => {
+    const o = new Map([
+      ["S", sheet("S", [["A1", 1], ["B1", 2], ["A2", 3]])],
+      ["R", sheet("R", [["C9", "x"]])],
+    ]);
+    const n = new Map([
+      ["S", sheet("S", [["A1", 9], ["B1", 2], ["A2", 4]])],
+      ["R2", sheet("R2", [["C9", "x"]])],
+    ]);
+    const panes = sideXlsx(diffXlsx(o, n, "wb"), o, n);
+    const targets = xlsxTargets(panes);
+    expect(targets.filter((t) => t.row >= 0)).toEqual([
+      { pane: 0, row: 0, col: 0 }, // A1 1 -> 9
+      { pane: 0, row: 1, col: 0 }, // A2 3 -> 4
+    ]);
+    // the second sheet is renamed (or remapped as removed+added): some header target exists
+    expect(targets.some((t) => t.row === -1)).toBe(true);
+  });
+
+  it("xlsx: unchanged panes contribute nothing; removed sheet is a header target", () => {
+    const o = new Map([["A", sheet("A", [["A1", 1]])], ["B", sheet("B", [["A1", 1]])]]);
+    const n = new Map([["A", sheet("A", [["A1", 1]])], ["B", sheet("B", [["A1", 2]])]]);
+    const targets = xlsxTargets(sideXlsx(diffXlsx(o, n, "wb"), o, n));
+    expect(targets).toEqual([{ pane: 1, row: 0, col: 0 }]);
+
+    const o2 = new Map([["Gone", sheet("Gone", [["A1", 1]])]]);
+    const n2 = new Map<string, Sheet>();
+    expect(xlsxTargets(sideXlsx(diffXlsx(o2, n2, "wb"), o2, n2))).toEqual([{ pane: 0, row: -1, col: -1 }]);
+  });
+
+  it("docx: plain context and all-equal tables are not targets", () => {
+    const a = { blocks: [para("ctx"), para("old"), table([["x"]]), para("gone")] };
+    const b = { blocks: [para("ctx"), para("new"), table([["x"]]), para("added")] };
+    const lines = sideDocx(a, b);
+    expect(lines.map((l) => l.type)).toEqual(["same", "edit", "tablePair", "edit"]);
+    expect(docxTargets(lines)).toEqual([1, 3]);
+  });
+});
+
 describe("render smoke (catches broken JSX paths before the browser does)", () => {
   it("SideBySideView renders demo docx and xlsx pairs to markup", async () => {
     const { renderToStaticMarkup } = await import("react-dom/server");
@@ -166,6 +206,8 @@ describe("render smoke (catches broken JSX paths before the browser does)", () =
     );
     expect(html).toContain("before · meeting-notes.docx");
     expect(html).toContain("bg-red-"); // at least one removed-side highlight
+    expect(html).toContain('id="dl-'); // navigator anchors present
+    expect(html).toMatch(/\d+ \/ \d+/); // navigator counter
 
     const x1 = await extractXlsx(demo("Q3-forecast.xlsx"));
     const x2 = await extractXlsx(demo("Q3-forecast-v2.xlsx"));

@@ -10,6 +10,8 @@ const CHIP = "rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-ambe
 const STYLE_CHIP = "rounded bg-zinc-100 px-1 text-[10px] text-zinc-500";
 const GUTTER = "text-[10px] text-zinc-400";
 
+export const docxLineId = (i: number) => `dl-${i}`;
+
 function Runs({ runs, faint }: { runs: Run[]; faint?: boolean }) {
   return (
     <>
@@ -50,8 +52,10 @@ function TRow({ cells, status, side }: { cells: string[] | null; status: TableRo
   );
 }
 
-function Line({ line }: { line: DocLine }) {
+function Line({ line, li, focused, onClick }: { line: DocLine; li: number; focused: boolean; onClick?: () => void }) {
   const cell = "px-3 py-1.5 text-sm leading-5 align-top";
+  const ring = focused ? "outline outline-2 -outline-offset-2 outline-sky-500" : "";
+  const click = onClick ? { onClick } : {};
   if (line.type === "tablePair" || line.type === "tableDump") {
     const rows: TableRowPair[] =
       line.type === "tablePair"
@@ -62,7 +66,7 @@ function Line({ line }: { line: DocLine }) {
             newCells: line.side === "new" ? r : null,
           }));
     return (
-      <div className="grid grid-cols-2 gap-4 border-y border-zinc-100 bg-zinc-50/60 py-1">
+      <div id={docxLineId(li)} {...click} className={`grid grid-cols-2 gap-4 border-y border-zinc-100 bg-zinc-50/60 py-1 ${ring} ${onClick ? "cursor-pointer" : ""}`}>
         <div className="space-y-px">{rows.map((r, i) => <TRow key={i} cells={r.oldCells} status={r.status} side="old" />)}</div>
         <div className="space-y-px">{rows.map((r, i) => <TRow key={i} cells={r.newCells} status={r.status} side="new" />)}</div>
       </div>
@@ -92,7 +96,7 @@ function Line({ line }: { line: DocLine }) {
     ) : null;
     const segs = diffWords(line.oldText, line.newText);
     return (
-      <div className="grid grid-cols-2 gap-x-4 border-y border-zinc-100">
+      <div id={docxLineId(li)} {...click} className={`grid grid-cols-2 gap-x-4 border-y border-zinc-100 ${ring} ${onClick ? "cursor-pointer" : ""}`}>
         <div className={`${cell} bg-red-50`}>
           {chip}
           <WordDiff segs={segs.filter((s) => s.kind !== "added")} mode="left" fallback={line.oldText} />
@@ -107,7 +111,7 @@ function Line({ line }: { line: DocLine }) {
   }
   const removed = line.type === "removed";
   return (
-    <div className="grid grid-cols-2 gap-x-4 border-y border-zinc-100">
+    <div id={docxLineId(li)} {...click} className={`grid grid-cols-2 gap-x-4 border-y border-zinc-100 ${ring} ${onClick ? "cursor-pointer" : ""}`}>
       <div className={`${cell} ${removed ? "bg-red-50" : ""}`}>
         {removed ? (
           <>
@@ -136,12 +140,24 @@ function Line({ line }: { line: DocLine }) {
   );
 }
 
-export default function SideDocx({ lines }: { lines: DocLine[] }) {
+export default function SideDocx({
+  lines,
+  targets,
+  focusLine,
+  onPick,
+}: {
+  lines: DocLine[];
+  targets: number[];
+  focusLine: number | null;
+  onPick: (index: number) => void;
+}) {
+  const indexOf = new Map(targets.map((line, i) => [line, i]));
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
-      {lines.map((l, i) => (
-        <Line key={i} line={l} />
-      ))}
+      {lines.map((l, i) => {
+        const t = indexOf.get(i);
+        return <Line key={i} line={l} li={i} focused={focusLine === i} onClick={t === undefined ? undefined : () => onPick(t)} />;
+      })}
     </div>
   );
 }

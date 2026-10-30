@@ -278,3 +278,36 @@ export function sideDocx(old: Docx, new_: Docx): DocLine[] {
   }
   return lines;
 }
+
+// ------------------------------------------------------------ targets ----
+
+/** Where the navigator jumps: a highlighted cell (pane-local grid indices,
+ *  identical on both halves) or, at row/col -1, the pane header (a sheet
+ *  that was renamed / added / removed). */
+export interface XlsxTarget {
+  pane: number;
+  row: number;
+  col: number;
+}
+
+export function xlsxTargets(panes: SheetPane[]): XlsxTarget[] {
+  const out: XlsxTarget[] = [];
+  panes.forEach((p, pi) => {
+    if (p.rename || p.note) out.push({ pane: pi, row: -1, col: -1 });
+    const rows = p.newRows.length ? p.newRows : p.oldRows; // removed panes only have the old grid
+    rows.forEach((r, ri) => r.cells.forEach((c, ci) => c?.changed && out.push({ pane: pi, row: ri, col: ci })));
+  });
+  return out;
+}
+
+/** Line indices worth jumping to: anything that is not plain context
+ *  (tablePair blocks whose rows are all equal count as context). */
+export function docxTargets(lines: DocLine[]): number[] {
+  const out: number[] = [];
+  lines.forEach((l, i) => {
+    if (l.type === "same") return;
+    if (l.type === "tablePair" && l.rows.every((r) => r.status === "same")) return;
+    out.push(i);
+  });
+  return out;
+}
