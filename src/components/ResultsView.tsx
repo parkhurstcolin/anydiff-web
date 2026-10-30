@@ -94,9 +94,10 @@ export default function ResultsView({
   const removes = content.filter((c) => c.after === null).length;
   const seg = (active: boolean) =>
     `px-3 py-1.5 ${active ? "bg-zinc-900 text-white" : "bg-white text-zinc-600 hover:bg-zinc-100"}`;
+  const sideActive = mode === "side" && !!pair && changes.length > 0;
 
   return (
-    <section className="mt-8">
+    <section className={sideActive ? "mt-3" : "mt-8"}>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <h2 className="text-sm font-semibold text-zinc-900">
           {changes.length === 0
@@ -131,7 +132,7 @@ export default function ResultsView({
         <SideBySideView pair={pair} changes={changes} oldName={oldName} newName={newName} />
       )}
 
-      {!(mode === "side" && pair && changes.length > 0) && (
+      {!sideActive && (
         <>
           {structural.length > 0 && (
         <div className="mt-4 rounded-lg border border-zinc-200 bg-white">

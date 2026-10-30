@@ -17,10 +17,12 @@ function DropZone({
   label,
   slot,
   onPick,
+  compact,
 }: {
   label: string;
   slot: Slot;
   onPick: (name: string, bytes: Promise<ArrayBuffer>) => void;
+  compact?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   return (
@@ -33,12 +35,14 @@ function DropZone({
         const f = e.dataTransfer.files?.[0];
         if (f) onPick(f.name, f.arrayBuffer());
       }}
-      className={`flex-1 rounded-lg border-2 border-dashed p-5 text-left transition ${
-        slot ? "border-sky-400 bg-sky-50" : "border-zinc-300 bg-white hover:border-zinc-400"
-      }`}
+      className={`flex-1 rounded-lg border-2 border-dashed text-left transition ${
+        compact ? "px-3 py-1.5" : "p-5"
+      } ${slot ? "border-sky-400 bg-sky-50" : "border-zinc-300 bg-white hover:border-zinc-400"}`}
     >
-      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</span>
-      <p className="mt-1 truncate text-sm font-medium text-zinc-900">
+      <span className={`font-medium uppercase tracking-wide text-zinc-500 ${compact ? "text-[10px]" : "text-xs"}`}>
+        {label}
+      </span>
+      <p className={`truncate font-medium text-zinc-900 ${compact ? "text-xs" : "mt-1 text-sm"}`}>
         {slot ? slot.name : "drop .xlsx / .docx or click to choose"}
       </p>
       <input
@@ -55,8 +59,7 @@ function DropZone({
   );
 }
 
-const DEMO_BTN =
-  "rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 disabled:opacity-40";
+const DEMO_BTN = "rounded-md border border-zinc-300 bg-white font-medium text-zinc-700 disabled:opacity-40";
 
 export default function DiffBoard() {
   const [oldFile, setOld] = useState<Slot>(null);
@@ -127,31 +130,45 @@ export default function DiffBoard() {
   const fullPage = mode === "side" && !!pair && !!changes && changes.length > 0;
 
   return (
-    <main className={`px-6 py-12 ${fullPage ? "w-full" : "mx-auto w-full max-w-5xl"}`}>
-      <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">AnyDiff</h1>
-      <p className="mt-1 max-w-xl text-sm text-zinc-600">
-        What actually changed between two Excel or Word files — values, formulas, paragraphs,
-        tables, renamed sheets. Everything runs in your browser; files never leave this tab.
-      </p>
+    <main className={fullPage ? "w-full px-4 pb-8 pt-3" : "mx-auto w-full max-w-5xl px-6 py-12"}>
+      <h1 className={`font-semibold tracking-tight text-zinc-900 ${fullPage ? "text-base" : "text-2xl"}`}>AnyDiff</h1>
+      {!fullPage && (
+        <p className="mt-1 max-w-xl text-sm text-zinc-600">
+          What actually changed between two Excel or Word files — values, formulas, paragraphs,
+          tables, renamed sheets. Everything runs in your browser; files never leave this tab.
+        </p>
+      )}
 
-      <div className="mt-6 flex gap-4">
-        <DropZone label="before" slot={oldFile} onPick={pick(setOld)} />
-        <DropZone label="after" slot={newFile} onPick={pick(setNew)} />
+      <div className={`flex gap-4 ${fullPage ? "mt-2" : "mt-6"}`}>
+        <DropZone label="before" slot={oldFile} onPick={pick(setOld)} compact={fullPage} />
+        <DropZone label="after" slot={newFile} onPick={pick(setNew)} compact={fullPage} />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className={`flex flex-wrap items-center gap-3 ${fullPage ? "mt-2" : "mt-4"}`}>
         <button
           type="button"
           disabled={!bothReady || busy}
           onClick={() => oldFile && newFile && run(oldFile, newFile)}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          className={`rounded-md bg-zinc-900 font-medium text-white disabled:opacity-40 ${
+            fullPage ? "px-3 py-1 text-xs" : "px-4 py-2 text-sm"
+          }`}
         >
           {busy ? "Diffing…" : "Compare"}
         </button>
-        <button type="button" disabled={busy} onClick={() => loadDemo("xlsx")} className={DEMO_BTN}>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => loadDemo("xlsx")}
+          className={`${DEMO_BTN} ${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2 text-sm"}`}
+        >
           Q3 spreadsheet demo
         </button>
-        <button type="button" disabled={busy} onClick={() => loadDemo("docx")} className={DEMO_BTN}>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => loadDemo("docx")}
+          className={`${DEMO_BTN} ${fullPage ? "px-3 py-1 text-xs" : "px-4 py-2 text-sm"}`}
+        >
           Meeting notes demo
         </button>
       </div>
