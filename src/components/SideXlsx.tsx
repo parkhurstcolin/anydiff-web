@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type Ref } from "react";
 
 import type { GridRow, SheetPane, XlsxTarget } from "../core/sideView";
 
@@ -19,13 +19,31 @@ const colLetter = (n: number): string => {
   return s;
 };
 
-function Grid({ rows, col0, side, pid, focus, onPick }: { rows: GridRow[]; col0: number; side: "old" | "new"; pid: number; focus: XlsxTarget | null; onPick?: (t: XlsxTarget) => void }) {
+function Grid({
+  rows,
+  col0,
+  side,
+  pid,
+  focus,
+  boxRef,
+  onScroll,
+  onPick,
+}: {
+  rows: GridRow[];
+  col0: number;
+  side: "old" | "new";
+  pid: number;
+  focus: XlsxTarget | null;
+  boxRef?: Ref<HTMLDivElement>;
+  onScroll?: () => void;
+  onPick?: (t: XlsxTarget) => void;
+}) {
   const changed = side === "old" ? LEFT : SIDE;
   const letters: string[] = [];
   for (let c = col0; c < col0 + (rows[0]?.cells.length ?? 0); c++) letters.push(colLetter(c));
   return (
     // no height cap: the grid grows with the sheet and the page scrolls
-    <div className="overflow-x-auto rounded border border-zinc-200">
+    <div ref={boxRef} onScroll={onScroll} className="overflow-x-auto rounded border border-zinc-200">
       <table className="border-collapse">
         <thead>
           <tr className="text-[10px] text-zinc-400">
@@ -64,6 +82,17 @@ function Grid({ rows, col0, side, pid, focus, onPick }: { rows: GridRow[]; col0:
   );
 }
 
+// Vertical is one shared page scroll now; horizontal still needs the two
+// halves locked together so a column never drifts out of line.
+function syncScrollLeft(src: HTMLDivElement | null, dst: HTMLDivElement | null, lock: { current: boolean }): void {
+  if (!src || !dst || lock.current || dst.scrollLeft === src.scrollLeft) return;
+  lock.current = true;
+  dst.scrollLeft = src.scrollLeft;
+  requestAnimationFrame(() => {
+    lock.current = false;
+  });
+}
+
 function Pane({
   pane,
   pid,
@@ -75,6 +104,11 @@ function Pane({
   focus: XlsxTarget | null;
   onPick: (t: XlsxTarget) => void;
 }) {
+  const oldBox = useRef<HTMLDivElement>(null);
+  const newBox = useRef<HTMLDivElement>(null);
+  const syncing = useRef(false);
+  const paired = pane.kind === "pair"; // both halves share the column window
+
   const headTarget: XlsxTarget = { pane: pid, row: -1, col: -1 };
   const isHead = focus && focus.pane === pid && focus.row === -1;
   const label = (s: string) => <span className="truncate font-mono text-xs text-zinc-700">{s || "—"}</span>;
@@ -108,8 +142,8 @@ function Pane({
         {pane.truncated && <span className={GUTTER}>cut off at 2,000 rows / 26 columns</span>}
       </div>
       <div className="grid grid-cols-2 gap-4 p-3">
-        {pane.kind === "added" ? <div className={GUTTER}>not in before</div> : <Grid rows={pane.oldRows} col0={pane.col0} side="old" pid={pid} focus={focus} onPick={onPick} />}
-        {pane.kind === "removed" ? <div className={GUTTER}>not in after</div> : <Grid rows={pane.newRows} col0={pane.col0} side="new" pid={pid} focus={focus} onPick={onPick} />}
+        {pane.kind === "added" ? <div className={GUTTER}>not in before</div> : <Grid rows={pane.oldRows} col0={pane.col0} side="old" pid={pid} focus={focus} boxRef={oldBox} onScroll={paired ? () => syncScrollLeft(oldBox.current, newBox.current, syncing) : undefined} onPick={onPick} />}
+        {pane.kind === "removed" ? <div className={GUTTER}>not in after</div> : <Grid rows={pane.newRows} col0={pane.col0} side="new" pid={pid} focus={focus} boxRef={newBox} onScroll={paired ? () => syncScrollLeft(newBox.current, oldBox.current, syncing) : undefined} onPick={onPick} />}
       </div>
     </div>
   );
