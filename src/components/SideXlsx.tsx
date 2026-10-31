@@ -9,14 +9,29 @@ const LEFT = "bg-red-100 text-red-900";
 const CHIP = "rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-900";
 const GUTTER = "text-[10px] text-zinc-400";
 const FOCUS = "relative z-[5] outline outline-2 outline-sky-500";
-// crosshair: the clicked cell's row/column, both halves; changed cells keep
-// their red/green so a highlight never masks a diff
-const SEL_ROW = "bg-sky-100/70";
-const SEL_COL = "bg-sky-100/70";
+// Active row/column: the row-number and column-letter headers ARE the
+// selectors — click one and the whole line repaints across both halves.
+// Changed cells keep their red/green so a highlight never masks a diff;
+// odd rows carry a faint stripe so the grid reads as rows and columns
+// even before anything is selected.
+const SEL_LINE = "bg-sky-200/80";
+const HEAD_ON = "bg-sky-200 text-sky-900";
+const STRIPE = "bg-zinc-50";
 const SEL_CELL = "relative z-[4] outline outline-2 -outline-offset-2 outline-sky-600";
 
 export const xlsxCellId = (pane: number, row: number, col: number, side: "o" | "n") => `sxt-${pane}-${row}-${col}-${side}`;
 export const xlsxPaneId = (pane: number) => `sxt-${pane}-h`;
+
+/** Header-selector state: the painted line in this pane. null = axis not
+ *  selected — headers pick one line, a cell click paints both. The ring
+ *  shows only on the half that was clicked (one selection, one ring);
+ *  the painted row/column is positional, so it spans both halves. */
+interface Sel {
+  pane: number;
+  row: number | null;
+  col: number | null;
+  side: "o" | "n";
+}
 
 const colLetter = (n: number): string => {
   let s = "";
@@ -33,7 +48,7 @@ function Grid({
   sel,
   boxRef,
   onScroll,
-  onCell,
+  onLine,
   onPick,
 }: {
   rows: GridRow[];
@@ -41,13 +56,14 @@ function Grid({
   side: "old" | "new";
   pid: number;
   focus: XlsxTarget | null;
-  sel: XlsxTarget | null;
+  sel: Sel | null;
   boxRef?: Ref<HTMLDivElement>;
   onScroll?: () => void;
-  onCell?: (row: number, col: number) => void;
+  onLine?: (row: number | null, col: number | null, side: "o" | "n") => void;
   onPick?: (t: XlsxTarget) => void;
 }) {
   const changed = side === "old" ? LEFT : SIDE;
+  const sKey = side === "old" ? ("o" as const) : ("n" as const); // half key as stored in Sel
   const selHere = sel && sel.pane === pid ? sel : null;
   const letters: string[] = [];
   for (let c = col0; c < col0 + (rows[0]?.cells.length ?? 0); c++) letters.push(colLetter(c));
@@ -56,13 +72,17 @@ function Grid({
     <div ref={boxRef} onScroll={onScroll} className="overflow-x-auto rounded border border-zinc-200">
       <table className="border-collapse">
         <thead>
-          <tr className="text-[10px] text-zinc-400">
-            <th className="sticky left-0 top-0 z-20 border-b border-r border-zinc-200 bg-zinc-50 px-1.5 py-1" />
+          <tr className="text-[11px]">
+            <th className="sticky left-0 top-0 z-20 border-b border-r border-zinc-300 bg-zinc-100 px-1.5 py-1" />
             {letters.map((l, ci) => (
               <th
                 key={l}
-                className={`sticky top-0 z-10 min-w-16 border-b border-r border-zinc-200 px-2 py-1 font-medium ${
-                  selHere && selHere.col === ci ? "bg-sky-100 text-sky-800" : "bg-zinc-50"
+                onClick={() => onLine?.(null, ci, sKey)} // the selector: paint this whole column
+                title={`highlight column ${l}`}
+                className={`sticky top-0 z-10 min-w-16 cursor-pointer border-b border-r px-2 py-1 font-semibold select-none ${
+                  selHere?.col === ci
+                    ? `border-sky-300 ${HEAD_ON}`
+                    : "border-zinc-300 bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
                 }`}
               >
                 {l}
@@ -74,27 +94,48 @@ function Grid({
           {rows.map((r, ri) => (
             <tr key={r.n}>
               <th
-                className={`sticky left-0 z-10 border-b border-r border-zinc-200 px-1.5 py-0.5 text-right align-top text-[10px] font-medium ${
-                  selHere && selHere.row === ri ? "bg-sky-100 text-sky-800" : "bg-zinc-50 text-zinc-400"
+                onClick={() => onLine?.(ri, null, sKey)} // the selector: paint this whole row
+                title={`highlight row ${r.n}`}
+                className={`sticky left-0 z-10 cursor-pointer border-b border-r px-1.5 py-0.5 text-right align-top text-[10px] font-semibold select-none ${
+                  selHere?.row === ri
+                    ? `border-sky-300 ${HEAD_ON}`
+                    : "border-zinc-300 bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
                 }`}
               >
                 {r.n}
               </th>
               {r.cells.map((cell, ci) => {
-                const isSel = selHere?.row === ri && selHere?.col === ci;
-                const cross = !cell?.changed && (selHere?.row === ri ? SEL_ROW : selHere?.col === ci ? SEL_COL : "");
+                // rings mark a REAL cell — paint one only on the half where
+                // its content exists AND that was clicked; on the other half
+                // the painted lines still show its position, but no phantom
+                // selector sits stuck on a blank or mirrored cell
+                const here = !!cell;
+                const isSel = here && selHere?.side === sKey && selHere?.row === ri && selHere?.col === ci;
+                // one background per cell, honest precedence: diff color
+                // > active line > idle stripe — a highlight never masks a diff
+                const bg = cell?.changed
+                  ? changed
+                  : selHere?.row === ri || selHere?.col === ci
+                    ? SEL_LINE
+                    : ri % 2 === 1
+                      ? STRIPE
+                      : "";
                 return (
                   <td
                     key={ci}
-                    id={xlsxCellId(pid, ri, ci, side === "old" ? "o" : "n")}
+                    id={xlsxCellId(pid, ri, ci, sKey)}
                     title={cell?.title ?? undefined}
                     onClick={() => {
-                      onCell?.(ri, ci);
+                      onLine?.(ri, ci, sKey);
                       if (cell?.changed && onPick) onPick({ pane: pid, row: ri, col: ci });
                     }}
-                    className={`max-w-56 cursor-pointer truncate border-b border-r border-zinc-100 px-2 py-0.5 font-mono text-xs ${
+                    className={`max-w-56 cursor-pointer truncate border-b border-r border-zinc-200 px-2 py-0.5 font-mono text-xs ${
                       cell?.changed ? changed : "text-zinc-700"
-                    } ${cross} ${isSel ? SEL_CELL : ""} ${focus && focus.pane === pid && focus.row === ri && focus.col === ci ? FOCUS : ""}`}
+                    } ${bg} ${isSel ? SEL_CELL : ""} ${
+                      // while a manual selection is live it owns the ring —
+                      // the navigator focus only surfaces on its own jumps
+                      here && !selHere && focus && focus.pane === pid && focus.row === ri && focus.col === ci ? FOCUS : ""
+                    }`}
                   >
                     {cell?.text ?? ""}
                   </td>
@@ -124,14 +165,14 @@ function Pane({
   pid,
   focus,
   sel,
-  onCell,
+  onLine,
   onPick,
 }: {
   pane: SheetPane;
   pid: number;
   focus: XlsxTarget | null;
-  sel: XlsxTarget | null;
-  onCell: (row: number, col: number) => void;
+  sel: Sel | null;
+  onLine: (row: number | null, col: number | null, side: "o" | "n") => void;
   onPick: (t: XlsxTarget) => void;
 }) {
   const oldBox = useRef<HTMLDivElement>(null);
@@ -175,12 +216,12 @@ function Pane({
         {pane.kind === "added" ? (
           <div className={GUTTER}>not in before</div>
         ) : (
-          <Grid rows={pane.oldRows} col0={pane.col0} side="old" pid={pid} focus={focus} sel={sel} boxRef={oldBox} onScroll={paired ? () => syncScrollLeft(oldBox.current, newBox.current, syncing) : undefined} onCell={onCell} onPick={onPick} />
+          <Grid rows={pane.oldRows} col0={pane.col0} side="old" pid={pid} focus={focus} sel={sel} boxRef={oldBox} onScroll={paired ? () => syncScrollLeft(oldBox.current, newBox.current, syncing) : undefined} onLine={onLine} onPick={onPick} />
         )}
         {pane.kind === "removed" ? (
           <div className={GUTTER}>not in after</div>
         ) : (
-          <Grid rows={pane.newRows} col0={pane.col0} side="new" pid={pid} focus={focus} sel={sel} boxRef={newBox} onScroll={paired ? () => syncScrollLeft(newBox.current, oldBox.current, syncing) : undefined} onCell={onCell} onPick={onPick} />
+          <Grid rows={pane.newRows} col0={pane.col0} side="new" pid={pid} focus={focus} sel={sel} boxRef={newBox} onScroll={paired ? () => syncScrollLeft(newBox.current, oldBox.current, syncing) : undefined} onLine={onLine} onPick={onPick} />
         )}
       </div>
     </div>
@@ -214,14 +255,27 @@ export default function SideXlsx({
   }, [targets]);
 
   const [lastPanes, setLastPanes] = useState(panes);
-  const [sel, setSel] = useState<XlsxTarget | null>(null);
+  const [lastFocus, setLastFocus] = useState(focus);
+  const [sel, setSel] = useState<Sel | null>(null);
   if (lastPanes !== panes) {
     // fresh diff → the old coordinates may point at unrelated cells
     setLastPanes(panes);
     if (sel) setSel(null);
   }
-  const pickCell = (row: number, col: number) =>
-    setSel((s) => (s && s.pane === tab && s.row === row && s.col === col ? null : { pane: tab, row, col }));
+  if (lastFocus !== focus) {
+    // a navigator jump retires a stale manual selection, so the click ring
+    // never trails behind the jump; a click on a changed cell sets focus and
+    // sel together on the same cell — that pair stays
+    setLastFocus(focus);
+    if (focus && sel && (sel.row !== focus.row || sel.col !== focus.col)) setSel(null);
+  }
+  // the selector: a cell click paints its row AND column and rings the
+  // half that was clicked; a header click paints just that line; clicking
+  // the same line in the same half again clears it
+  const pickLine = (row: number | null, col: number | null, side: "o" | "n") =>
+    setSel((s) =>
+      s && s.pane === tab && s.row === row && s.col === col && s.side === side ? null : { pane: tab, row, col, side },
+    );
 
   const lastJump = useRef<XlsxTarget | null>(null);
   useEffect(() => {
@@ -265,7 +319,7 @@ export default function SideXlsx({
         </div>
       )}
       {visible.map((p) => (
-        <Pane key={panes.indexOf(p)} pane={p} pid={panes.indexOf(p)} focus={focus} sel={sel} onCell={pickCell} onPick={pick} />
+        <Pane key={panes.indexOf(p)} pane={p} pid={panes.indexOf(p)} focus={focus} sel={sel} onLine={pickLine} onPick={pick} />
       ))}
     </>
   );

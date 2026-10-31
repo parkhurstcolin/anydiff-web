@@ -78,7 +78,7 @@ export default function SideBySideView({
         <div className="flex flex-wrap gap-3 text-[11px] text-zinc-500">
           <span className="rounded bg-red-100 px-2 py-0.5 text-red-900">before</span>
           <span className="rounded bg-emerald-100 px-2 py-0.5 text-emerald-900">after</span>
-          <span className="hidden sm:inline">context is dimmed · click a highlight · n / p to step</span>
+          <span className="hidden sm:inline">context is dimmed · click a highlight · n / p to step · click a row number / column letter to trace its line</span>
         </div>
         {count > 0 && (
           <div className="flex items-center gap-1.5 text-xs">
