@@ -5,7 +5,6 @@ import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 import ResultsView from "./ResultsView";
 import { diffDocx } from "../core/docxDiff";
 import { hashBytes } from "../core/hash";
-import { recalcSheets } from "../core/recalc";
 import { diffXlsx } from "../core/xlsxDiff";
 import type { Change } from "../core/model";
 import type { DocPair } from "../core/sideView";
@@ -125,6 +124,7 @@ export default function DiffBoard() {
         let s1 = await extractXlsx(a);
         let s2 = await extractXlsx(b);
         if (recalcOn) {
+          const { recalcSheets } = await import("../core/recalc"); // engine chunk loads only on demand
           const r1 = recalcSheets(s1);
           const r2 = recalcSheets(s2);
           const skip = r1.skipped ?? r2.skipped;
