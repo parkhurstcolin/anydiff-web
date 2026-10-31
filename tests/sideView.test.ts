@@ -50,14 +50,14 @@ describe("sideXlsx", () => {
     expect(panes.length).toBe(newS.size + changes.filter((c) => c.kind === "sheet_removed").length);
   });
 
-  it("window frames the change with context rows and columns", () => {
+  it("renders the whole sheet from row 1, not a window around the change", () => {
     const o = new Map([["S", sheet("S", [["A1", "head"], ["F10", 1]])]]);
     const n = new Map([["S", sheet("S", [["A1", "head"], ["F10", 2]])]]);
     const pane = sideXlsx(diffXlsx(o, n, "wb"), o, n)[0];
-    expect(pane.row0).toBe(8);
-    expect(pane.col0).toBe(4);
-    expect(pane.oldRows.length).toBe(5); // rows 8..12
-    expect(pane.oldRows[0].cells.length).toBe(5); // cols D..H
+    expect(pane.row0).toBe(1);
+    expect(pane.col0).toBe(1);
+    expect(pane.oldRows.length).toBe(12); // used range ends at 10, floor of 12 shown
+    expect(pane.oldRows[9].cells.length).toBe(10); // cols A..J covers the F column
     const marked = [...pane.oldRows, ...pane.newRows].flatMap((r) => r.cells.filter((c) => c?.changed)).length;
     expect(marked).toBe(2); // 1 and 2, one per side
   });

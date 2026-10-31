@@ -141,7 +141,7 @@ function Pane({
             jump
           </button>
         )}
-        {pane.truncated && <span className={GUTTER}>window around changes</span>}
+        {pane.truncated && <span className={GUTTER}>cut off at 2,000 rows / 26 columns</span>}
       </div>
       <div className="grid grid-cols-2 gap-4 p-3">
         {pane.kind === "added" ? <div className={GUTTER}>not in before</div> : <Grid rows={pane.oldRows} col0={pane.col0} side="old" pid={pid} focus={focus} boxRef={oldBox} onScroll={paired ? () => syncScroll(oldBox.current, newBox.current, syncing) : undefined} onPick={onPick} />}

@@ -45,9 +45,11 @@ export interface SheetPane {
   note: string | null; // e.g. "sheet removed", "sheet added"
 }
 
-const MAX_GRID_ROWS = 80;
+// Whole-sheet rendering: the grid runs from row 1 to the end of the used
+// range, like scrolling a real spreadsheet. The row cap is a DOM guard for
+// pathological sheets — when it bites, `truncated` says so in the UI.
+const MAX_GRID_ROWS = 2000;
 const MAX_GRID_COLS = 26;
-const CONTEXT = 2;
 
 const colLetter = (n: number): string => {
   let s = "";
@@ -106,8 +108,9 @@ function gridFor(sheet: Sheet | undefined, changedAddrs: Set<string>, row0: numb
 }
 
 /** Panes for the spreadsheet side-by-side: one per new sheet (workbook
- *  order), removed sheets last. Windows center on the sheet's changed
- *  addresses with ±CONTEXT rows/cols of breathing room.
+ *  order), removed sheets last. Each pane renders the whole used range from
+ *  row 1 downward (MAX_GRID_ROWS aside), so every changed cell is on the
+ *  page and jumps never need to "load" anything.
  *  `values: true` renders formula cells by their (recomputed) value. */
 export function sideXlsx(
   changes: Change[],
@@ -134,35 +137,14 @@ export function sideXlsx(
     for (const key of cellByAddr.keys()) {
       if (key.startsWith(newName + "!")) changed.add(key.slice(newName.length + 1));
     }
-    let r0 = 1;
-    let c0 = 1;
-    let r1 = 12;
-    let c1 = 10;
-    if (changed.size) {
-      let minR = 1e9;
-      let maxR = 0;
-      let minC = 1e9;
-      let maxC = 0;
-      for (const addr of changed) {
-        const rc = splitAddr(addr);
-        if (!rc) continue;
-        minR = Math.min(minR, rc[0]);
-        maxR = Math.max(maxR, rc[0]);
-        minC = Math.min(minC, rc[1]);
-        maxC = Math.max(maxC, rc[1]);
-      }
-      r0 = Math.max(1, minR - CONTEXT);
-      r1 = maxR + CONTEXT;
-      c0 = Math.max(1, minC - CONTEXT);
-      c1 = maxC + CONTEXT;
-    } else {
-      const [er, ec] = extent(o ?? n!);
-      r1 = Math.min(er, r1);
-      c1 = Math.min(ec, c1);
-    }
-    const truncated = r1 - r0 + 1 > MAX_GRID_ROWS || c1 - c0 + 1 > MAX_GRID_COLS;
-    r1 = Math.min(r1, r0 + MAX_GRID_ROWS - 1);
-    c1 = Math.min(c1, c0 + MAX_GRID_COLS - 1);
+    const r0 = 1;
+    const c0 = 1;
+    const [erO, ecO] = o ? extent(o) : [1, 1];
+    const [erN, ecN] = n ? extent(n) : [1, 1];
+    const r1 = Math.min(Math.max(erO, erN, 12), MAX_GRID_ROWS);
+    const c1 = Math.min(Math.max(ecO, ecN, 10), MAX_GRID_COLS);
+    const truncated =
+      Math.max(erO, erN) > MAX_GRID_ROWS || Math.max(ecO, ecN) > MAX_GRID_COLS;
     panes.push({
       kind,
       oldLabel: kind === "added" ? "" : oldName,
