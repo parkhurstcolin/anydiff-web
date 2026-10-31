@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 
 import ResultsView from "./ResultsView";
 import { diffDocx } from "../core/docxDiff";
 import { hashBytes } from "../core/hash";
+import { recalcSheets } from "../core/recalc";
 import { diffXlsx } from "../core/xlsxDiff";
 import type { Change } from "../core/model";
 import type { DocPair } from "../core/sideView";
@@ -58,6 +59,31 @@ function DropZone({
 
 const DEMO_BTN = "rounded-md border border-zinc-300 bg-white font-medium text-zinc-700 disabled:opacity-40";
 
+// localStorage as a real store: SSR-safe, no setState-in-effect, tabs stay in sync
+const recalcPrefSubscribe = (cb: () => void) => {
+  window.addEventListener("storage", cb);
+  window.addEventListener("anydiff-recalc", cb);
+  return () => {
+    window.removeEventListener("storage", cb);
+    window.removeEventListener("anydiff-recalc", cb);
+  };
+};
+const readRecalcPref = () => {
+  try {
+    return localStorage.getItem("anydiff.recalc") === "1";
+  } catch {
+    return false;
+  }
+};
+const writeRecalcPref = (on: boolean) => {
+  try {
+    localStorage.setItem("anydiff.recalc", on ? "1" : "0");
+  } catch {
+    /* private mode: session-only */
+  }
+  window.dispatchEvent(new Event("anydiff-recalc"));
+};
+
 export default function DiffBoard() {
   const [oldFile, setOld] = useState<Slot>(null);
   const [newFile, setNew] = useState<Slot>(null);
@@ -66,10 +92,13 @@ export default function DiffBoard() {
   const [mode, setMode] = useState<"side" | "list">("side");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const recalc = useSyncExternalStore(recalcPrefSubscribe, readRecalcPref, () => false);
+  const [recalcNote, setRecalcNote] = useState<string | null>(null);
 
-  const run = useCallback(async (old: NonNullable<Slot>, fresh: NonNullable<Slot>) => {
+  const run = useCallback(async (old: NonNullable<Slot>, fresh: NonNullable<Slot>, recalcOn: boolean) => {
     setBusy(true);
     setError(null);
+    setRecalcNote(null);
     try {
       if (old.ext !== fresh.ext) {
         throw new Error("Both files must be the same type — .xlsx with .xlsx, .docx with .docx.");
@@ -93,8 +122,24 @@ export default function DiffBoard() {
         setPair({ kind: "docx", old: d1, new: d2 });
         setChanges(diffDocx(d1, d2, fresh.name));
       } else {
-        const s1 = await extractXlsx(a);
-        const s2 = await extractXlsx(b);
+        let s1 = await extractXlsx(a);
+        let s2 = await extractXlsx(b);
+        if (recalcOn) {
+          const r1 = recalcSheets(s1);
+          const r2 = recalcSheets(s2);
+          const skip = r1.skipped ?? r2.skipped;
+          if (skip) {
+            setRecalcNote(`recalculation skipped: ${skip}`);
+          } else {
+            s1 = r1.sheets;
+            s2 = r2.sheets;
+            const n = r1.computed + r2.computed;
+            const f = r1.failed + r2.failed;
+            setRecalcNote(
+              `${n} formula cells recomputed in the browser${f ? `, ${f} kept as saved (errors, dates, exotic results)` : ""} — values below are computed, not what the files stored`,
+            );
+          }
+        }
         setPair({ kind: "xlsx", old: s1, new: s2 });
         setChanges(diffXlsx(s1, s2, fresh.name));
       }
@@ -132,7 +177,7 @@ export default function DiffBoard() {
     const fresh: NonNullable<Slot> = { name: newName, ext: kind, bytes: f(newName) };
     setOld(old);
     setNew(fresh);
-    await run(old, fresh);
+    await run(old, fresh, recalc);
   }
 
   const bothReady = oldFile && newFile;
@@ -157,7 +202,7 @@ export default function DiffBoard() {
           <button
             type="button"
             disabled={!bothReady || busy}
-            onClick={() => oldFile && newFile && run(oldFile, newFile)}
+            onClick={() => oldFile && newFile && run(oldFile, newFile, recalc)}
             className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
             {busy ? "Diffing…" : "Compare"}
@@ -178,12 +223,30 @@ export default function DiffBoard() {
           >
             Meeting notes demo
           </button>
+          <label
+            className={`ml-auto flex select-none items-center gap-2 text-xs ${oldFile?.ext === "docx" || newFile?.ext === "docx" ? "text-zinc-300" : "text-zinc-600"}`}
+            title="xlsx only: evaluate every formula in the browser and diff the computed results instead of the values the files stored"
+          >
+            <input
+              type="checkbox"
+              className="size-3.5 accent-sky-600"
+              disabled={oldFile?.ext === "docx" || newFile?.ext === "docx"}
+              checked={recalc}
+              onChange={(e) => writeRecalcPref(e.target.checked)}
+            />
+            recalculate formulas in browser
+          </label>
         </div>
 
         {error && <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       </div>
 
       <div className={fullPage ? "" : "mx-auto w-full max-w-5xl"}>
+        {changes && recalcNote && (
+          <div className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-900">
+            computed mode · {recalcNote}
+          </div>
+        )}
         {changes && (
           <ResultsView
             key={`${oldFile?.name}->${newFile?.name}`}
