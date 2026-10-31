@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { fmtValue, visible } from "../src/core/format";
+import { fmtDisplay, fmtValue, visible } from "../src/core/format";
+
+describe("fmtDisplay()", () => {
+  it("caps numbers at two decimals", () => {
+    expect(fmtDisplay(0.30000000000000004)).toBe("0.3"); // float artifact
+    expect(fmtDisplay(45.60000000000001)).toBe("45.6");
+    expect(fmtDisplay(1234.567)).toBe("1234.57");
+    expect(fmtDisplay(20)).toBe("20"); // integers stay plain
+    expect(fmtDisplay(-0)).toBe("0");
+  });
+  it("never rounds a tiny value into a lying zero, and keeps other rules", () => {
+    expect(fmtDisplay(1e-7)).toBe("1e-7");
+    expect(fmtDisplay(-0.001)).toBe("-0.001");
+    expect(fmtDisplay(20000)).toBe("20K"); // scale path untouched
+    expect(fmtDisplay(true)).toBe("TRUE");
+    expect(fmtDisplay("45.6789")).toBe("45.6789"); // strings verbatim
+    expect(fmtDisplay(null)).toBe("");
+  });
+});
 
 describe("fmtValue()", () => {
   it("formats the demo line values", () => {

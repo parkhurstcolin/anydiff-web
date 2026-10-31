@@ -93,11 +93,13 @@ export default function DiffBoard() {
   const [busy, setBusy] = useState(false);
   const recalc = useSyncExternalStore(recalcPrefSubscribe, readRecalcPref, () => false);
   const [recalcNote, setRecalcNote] = useState<string | null>(null);
+  const [computedMode, setComputedMode] = useState(false);
 
   const run = useCallback(async (old: NonNullable<Slot>, fresh: NonNullable<Slot>, recalcOn: boolean) => {
     setBusy(true);
     setError(null);
     setRecalcNote(null);
+    setComputedMode(false);
     try {
       if (old.ext !== fresh.ext) {
         throw new Error("Both files must be the same type — .xlsx with .xlsx, .docx with .docx.");
@@ -133,6 +135,7 @@ export default function DiffBoard() {
           } else {
             s1 = r1.sheets;
             s2 = r2.sheets;
+            setComputedMode(true);
             const n = r1.computed + r2.computed;
             const f = r1.failed + r2.failed;
             setRecalcNote(
@@ -256,6 +259,7 @@ export default function DiffBoard() {
             onMode={setMode}
             oldName={oldFile?.name}
             newName={newFile?.name}
+            computed={computedMode}
           />
         )}
       </div>

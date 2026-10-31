@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import SideBySideView from "./SideBySideView";
-import { fmtValue, visible } from "../core/format";
+import { fmtDisplay, visible } from "../core/format";
 import type { Change } from "../core/model";
 import type { DocPair } from "../core/sideView";
 import { diffWords } from "../core/wordDiff";
@@ -32,7 +32,7 @@ function ValueDiff({ c }: { c: Change }) {
     );
   }
   const side = (v: string | number | boolean | null) =>
-    v === null ? "" : typeof v === "string" ? `"${visible(fmtValue(v))}"` : fmtValue(v);
+    v === null ? "" : typeof v === "string" ? `"${visible(fmtDisplay(v))}"` : fmtDisplay(v);
   return (
     <>
       {c.before !== null && <span className={REMOVED}>{side(c.before)}</span>}
@@ -71,6 +71,7 @@ export default function ResultsView({
   onMode,
   oldName,
   newName,
+  computed,
 }: {
   changes: Change[];
   pair?: DocPair | null;
@@ -78,6 +79,7 @@ export default function ResultsView({
   onMode: (m: "side" | "list") => void;
   oldName?: string;
   newName?: string;
+  computed?: boolean;
 }) {
   const [showAll, setShowAll] = useState(false);
   const structural = changes.filter(isStructural);
@@ -129,7 +131,7 @@ export default function ResultsView({
       )}
 
       {mode === "side" && pair && changes.length > 0 && (
-        <SideBySideView pair={pair} changes={changes} oldName={oldName} newName={newName} />
+        <SideBySideView pair={pair} changes={changes} oldName={oldName} newName={newName} computed={computed} />
       )}
 
       {!sideActive && (

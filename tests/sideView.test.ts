@@ -94,6 +94,22 @@ describe("sideXlsx", () => {
     expect(added?.newRows.length).toBeGreaterThan(0);
     expect(added?.oldRows.length).toBe(0);
   });
+
+  it("computed mode shows recomputed values in the boxes, formula in the tooltip", () => {
+    const sheetF = (name: string, e: [string, number | string | null, string | null][]): Sheet => ({
+      name,
+      cells: new Map(e.map(([addr, value, formula]) => [addr, { addr, value, formula }])),
+    });
+    const o = new Map([["S", sheetF("S", [["A1", 2, null], ["B1", 20, "=A1*10"]])]]);
+    const n = new Map([["S", sheetF("S", [["A1", 3, null], ["B1", 30, "=A1*10"]])]]);
+    const ch = diffXlsx(o, n, "wb");
+    const classic = sideXlsx(ch, o, n)[0].newRows[0].cells[1];
+    expect(classic?.text).toBe("=A1*10"); // default: formula text, as before
+    const computed = sideXlsx(ch, o, n, { values: true })[0].newRows[0].cells[1];
+    expect(computed?.text).toBe("30"); // computed mode: the number is visible
+    expect(computed?.title).toContain("=A1*10");
+    expect(computed?.changed).toBe(true);
+  });
 });
 describe("sideDocx", () => {
   it("meeting-notes demo: heading edit, context lines and an inserted table row", async () => {

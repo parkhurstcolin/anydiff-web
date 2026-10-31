@@ -10,7 +10,7 @@ import type { Change, Confidence } from "./model";
 import { sequenceMatcher } from "./sequenceMatcher";
 import { paragraphText, type Block, type Docx, type Run, type TableBlock } from "../extract/docx";
 import type { Cell, Sheet } from "../extract/xlsx";
-import { fmtValue } from "./format";
+import { fmtDisplay } from "./format";
 
 /** What the extractors produced, kept around so the UI can render the
  *  documents themselves, not just the change list. */
@@ -76,25 +76,29 @@ const extent = (sheet: Sheet): [number, number] => {
   return [Math.max(1, r), Math.max(1, c)];
 };
 
-function gridCell(c: Cell, changed: boolean): GridCell {
+function gridCell(c: Cell, changed: boolean, showValues: boolean): GridCell {
+  if (c.formula !== null && c.value !== null && showValues) {
+    // computed mode: the number is the story, the formula goes in the tooltip
+    return { text: fmtDisplay(c.value), title: `${c.formula} · recomputed in browser`, changed };
+  }
   if (c.formula !== null) {
     return {
       text: c.formula,
-      title: c.value === null ? null : `shows ${fmtValue(c.value)}`,
+      title: c.value === null ? null : `shows ${fmtDisplay(c.value)}`,
       changed,
     };
   }
-  return { text: fmtValue(c.value), title: null, changed };
+  return { text: fmtDisplay(c.value), title: null, changed };
 }
 
-function gridFor(sheet: Sheet | undefined, changedAddrs: Set<string>, row0: number, row1: number, col0: number, col1: number): GridRow[] {
+function gridFor(sheet: Sheet | undefined, changedAddrs: Set<string>, row0: number, row1: number, col0: number, col1: number, showValues: boolean): GridRow[] {
   const rows: GridRow[] = [];
   for (let r = row0; r <= row1; r++) {
     const cells: (GridCell | null)[] = [];
     for (let c = col0; c <= col1; c++) {
       const addr = colLetter(c) + r;
       const cell = sheet?.cells.get(addr);
-      cells.push(cell ? gridCell(cell, changedAddrs.has(addr)) : null);
+      cells.push(cell ? gridCell(cell, changedAddrs.has(addr), showValues) : null);
     }
     rows.push({ n: r, cells });
   }
@@ -103,8 +107,14 @@ function gridFor(sheet: Sheet | undefined, changedAddrs: Set<string>, row0: numb
 
 /** Panes for the spreadsheet side-by-side: one per new sheet (workbook
  *  order), removed sheets last. Windows center on the sheet's changed
- *  addresses with ±CONTEXT rows/cols of breathing room. */
-export function sideXlsx(changes: Change[], oldSheets: Map<string, Sheet>, newSheets: Map<string, Sheet>): SheetPane[] {
+ *  addresses with ±CONTEXT rows/cols of breathing room.
+ *  `values: true` renders formula cells by their (recomputed) value. */
+export function sideXlsx(
+  changes: Change[],
+  oldSheets: Map<string, Sheet>,
+  newSheets: Map<string, Sheet>,
+  opts: { values?: boolean } = {},
+): SheetPane[] {
   const renamed = new Map<string, { old: string; conf: Confidence }>();
   const removed = new Set<string>();
   const added = new Set<string>();
@@ -161,8 +171,8 @@ export function sideXlsx(changes: Change[], oldSheets: Map<string, Sheet>, newSh
       confidence,
       row0: r0,
       col0: c0,
-      oldRows: kind === "added" ? [] : gridFor(o, changed, r0, r1, c0, c1),
-      newRows: kind === "removed" ? [] : gridFor(n, changed, r0, r1, c0, c1),
+      oldRows: kind === "added" ? [] : gridFor(o, changed, r0, r1, c0, c1, opts.values === true),
+      newRows: kind === "removed" ? [] : gridFor(n, changed, r0, r1, c0, c1, opts.values === true),
       truncated,
       note,
     });

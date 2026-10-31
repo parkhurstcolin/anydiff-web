@@ -19,18 +19,20 @@ export default function SideBySideView({
   changes,
   oldName,
   newName,
+  computed,
 }: {
   pair: DocPair;
   changes: Change[];
   oldName?: string;
   newName?: string;
+  computed?: boolean; // values came from the browser recalculation
 }) {
   const [nav, setNav] = useState({ pair, focus: 0, tab: 0, touched: false });
   if (nav.pair !== pair) setNav({ pair, focus: 0, tab: 0, touched: false }); // fresh diff: start at the top
 
   const lines = useMemo(() => (pair.kind === "docx" ? sideDocx(pair.old, pair.new) : null), [pair]);
   const shown = useMemo(() => lines?.slice(0, MAX_DOCX_LINES) ?? null, [lines]);
-  const panes = useMemo(() => (pair.kind === "xlsx" ? sideXlsx(changes, pair.old, pair.new) : []), [pair, changes]);
+  const panes = useMemo(() => (pair.kind === "xlsx" ? sideXlsx(changes, pair.old, pair.new, { values: computed }) : []), [pair, changes, computed]);
   const targets = useMemo(
     () => (pair.kind === "xlsx" ? xlsxTargets(panes) : docxTargets(shown ?? [])),
     [pair.kind, panes, shown],

@@ -57,3 +57,16 @@ export function fmtValue(v: unknown): string {
   }
   return String(v);
 }
+
+/** UI-only number view: same rules as fmtValue, but numbers below the K
+ *  scale show at most 2 decimals — float artifacts from recalculation
+ *  (0.30000000000000004) and over-precise stored values render as humans
+ *  read them. Never used for Change records or parity; tiny non-zero
+ *  values keep their exact form instead of rounding to a lying "0". */
+export function fmtDisplay(v: unknown): string {
+  if (typeof v === "number" && Number.isFinite(v) && Math.abs(v) < 1e4) {
+    const r = Math.round(v * 100) / 100;
+    if (r !== 0 || v === 0) return String(Object.is(r, -0) ? 0 : r);
+  }
+  return fmtValue(v);
+}
